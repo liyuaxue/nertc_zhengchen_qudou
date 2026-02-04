@@ -193,6 +193,11 @@ choice WAKE_WORD_TYPE
 
 endchoice
 
+config USE_MUSIC_PLAYER
+    bool "ENABLE MUSIC PLAYER"
+    default y
+    depends on (IDF_TARGET_ESP32S3 || IDF_TARGET_ESP32P4) && SPIRAM
+
 config CUSTOM_WAKE_WORD
     string "Custom Wake Word"
     default "xiao tu dou"

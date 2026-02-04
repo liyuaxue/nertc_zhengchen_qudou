@@ -35,6 +35,59 @@ static const char* const RTC_CALL_STATE_STRINGS[] = {
 std::string NeRtcProtocol::config_file_path_ = "/spiffs/config.json";
 #endif
 
+void ParseSongListFromJson(const std::string& json, std::vector<MusicInfo>& out_list, bool& play_now){
+    out_list.clear();
+    cJSON* root = cJSON_Parse(json.c_str());
+    if (!root) {
+        ESP_LOGE(TAG, "ParseSongListFromJson: Failed to parse JSON");
+        return;
+    }
+
+    cJSON* need_confirm = cJSON_GetObjectItem(root, "need_confirm");
+    if(cJSON_IsBool(need_confirm) && need_confirm->valueint == 0){
+        play_now = true;
+    }
+    auto song_list = cJSON_GetObjectItem(root, "song_list");
+    if (!cJSON_IsArray(song_list) || cJSON_GetArraySize(song_list) == 0) {
+        ESP_LOGE(TAG, "ParseSongListFromJson: 'song_list' is not an array");
+        cJSON_Delete(root);
+        return;
+    }
+    out_list.resize(cJSON_GetArraySize(song_list));
+    for (int i = 0; i < cJSON_GetArraySize(song_list); ++i) {
+        cJSON* song_item = cJSON_GetArrayItem(song_list, i);
+        if (cJSON_IsObject(song_item)) {
+            MusicInfo music_info;
+            cJSON* name = cJSON_GetObjectItem(song_item, "name");
+            cJSON* uri = cJSON_GetObjectItem(song_item, "url");
+            cJSON* album = cJSON_GetObjectItem(song_item, "album");
+            cJSON* artist = cJSON_GetObjectItem(song_item, "artist");
+            cJSON* index = cJSON_GetObjectItem(song_item, "index");
+            if(!cJSON_IsNumber(index) || index->valueint >= cJSON_GetArraySize(song_list)){
+                ESP_LOGI(TAG, "ParseSongListFromJson: invalid song index");
+                cJSON_Delete(root);
+                return;
+            }
+            if (cJSON_IsString(name)) {
+                music_info.name = name->valuestring;
+            }
+            if (cJSON_IsString(uri)) {
+                music_info.uri = uri->valuestring;
+            }
+            if (cJSON_IsString(album)) {
+                music_info.album = album->valuestring;
+            }
+            if (cJSON_IsString(artist)) {
+                music_info.artist = artist->valuestring;
+            }
+            out_list[index->valueint] = music_info;
+            ESP_LOGI(TAG, "ParseSongListFromJson: Parsed song - Name: %s, URI: %s, Album: %s, Artist: %s", 
+                     music_info.name.c_str(), music_info.uri.c_str(), music_info.album.c_str(), music_info.artist.c_str());
+        }
+    }
+    cJSON_Delete(root);
+}
+
 NeRtcProtocol::NeRtcProtocol() {
     std::string device_id = Board::GetInstance().GetDeviceId();
     ESP_LOGI(TAG, "Start create nertc sdk device_id:%s Free: %u minimal: %u", device_id.c_str(), heap_caps_get_free_size(MALLOC_CAP_INTERNAL), heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL));
@@ -873,6 +926,31 @@ void NeRtcProtocol::OnAiData(const nertc_sdk_callback_context_t* ctx, nertc_sdk_
         cJSON_AddItemToObject(mcp_json, "payload", payload_obj);
         if (instance->on_incoming_json_) instance->on_incoming_json_(mcp_json);
         cJSON_Delete(mcp_json);
+
+    }else if(strncmp(type_str, "songSearch", type_len) == 0) {
+        cJSON* data_json = cJSON_Parse(data_str);
+        if (!data_json) {
+            ESP_LOGE(TAG, "Failed to parse JSON data");
+            return;
+        }
+        cJSON* message = cJSON_GetObjectItem(data_json, "message");
+        if (!message || !cJSON_IsString(message)) {
+            ESP_LOGE(TAG, "message is null");
+            cJSON_Delete(data_json);
+            return;
+        }
+        std::string songList = message->valuestring;
+#ifdef CONFIG_USE_MUSIC_PLAYER
+        Application::GetInstance().Schedule([songList]() {
+            std::vector<MusicInfo> searched_song_list;
+            bool play_now = false;
+            ParseSongListFromJson(songList, searched_song_list, play_now);
+            if(searched_song_list.size() > 0){
+                MusicPlayer::GetInstance().UpdateAirMusicListAndPlay(searched_song_list, play_now);
+            }
+        });
+#endif
+        cJSON_Delete(data_json);
     }
 }
 

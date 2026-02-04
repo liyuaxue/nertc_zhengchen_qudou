@@ -109,6 +109,7 @@ public:
     std::unique_ptr<AudioStreamPacket> PopPacketFromSendQueue();
     void PlaySound(const std::string_view& sound);
     bool ReadAudioData(std::vector<int16_t>& data, int sample_rate, int samples);
+    void UpdateLastOutputTime();
 #ifdef CONFIG_USE_AUDIO_CODEC_ENCODE_OPUS
     bool ReadAudioData(std::vector<uint8_t>& data, int sample_rate, int samples);
     void OnAudioInputDecodeForWakeWord();

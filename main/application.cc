@@ -266,6 +266,9 @@ void Application::DismissAlert() {
 }
 
 void Application::ToggleChatState() {
+#ifdef CONFIG_USE_MUSIC_PLAYER
+    MusicPlayer::GetInstance().InterruptPlay();
+#endif
     if (device_state_ == kDeviceStateActivating) {
         SetDeviceState(kDeviceStateIdle);
         return;
@@ -437,7 +440,11 @@ void Application::Start() {
     int interrupteMode = ota.GetOtaAgentInterruptMode();
     agent_interrupt_mode_ = interrupteMode;
     aec_mode_ = interrupteMode == 0 ? kAecOff : kAecOnDeviceSide;
-
+#ifdef CONFIG_USE_MUSIC_PLAYER
+    if (ota.GetSupportAirMusicPlayer() && (Board::GetInstance().GetBoardType() != "ml307" || ota.GetSupportAirMusicIn4G())){
+        MusicPlayer::GetInstance().Initialize(codec, &audio_service_);
+    } 
+#endif
     // Initialize the protocol
     display->SetStatus(Lang::Strings::LOADING_PROTOCOL);
 
@@ -710,6 +717,9 @@ void Application::OnWakeWordDetected() {
     }
 
     if (device_state_ == kDeviceStateIdle) {
+#ifdef CONFIG_USE_MUSIC_PLAYER
+        MusicPlayer::GetInstance().InterruptPlay();
+#endif
         audio_service_.EncodeWakeWord();
 
         if (!protocol_->IsAudioChannelOpened()) {
@@ -1101,4 +1111,21 @@ void Application::SetAISleep() {
     }
 
     protocol_->SetAISleep();
+}
+
+void Application::Close() {
+    if (device_state_ == kDeviceStateActivating) {
+        SetDeviceState(kDeviceStateIdle);
+        return;
+    }
+    SetDeviceState(kDeviceStateIdle);
+
+    if (!protocol_) {
+        ESP_LOGE(TAG, "Protocol not initialized");
+        return;
+    }
+
+    Schedule([this]() {
+        protocol_->CloseAudioChannel();
+    });
 }

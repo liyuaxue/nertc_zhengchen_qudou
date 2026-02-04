@@ -125,6 +125,11 @@ std::string Board::GetSystemInfoJson() {
 
     auto app_desc = esp_app_get_description();
     json += R"("application":{)";
+        //capablities add
+    json += R"("capabilities":{"netease_cloud_music":{"support_play":)";
+    json += (GetBoardType() == std::string("wifi") ? "true" : "false");
+    json += R"(}},)";
+    
     json += R"("name":")" + std::string(app_desc->project_name) + R"(",)";
     json += R"("version":")" + std::string(app_desc->version) + R"(",)";
     json += "\"board_name\":\"" + GetBoardName() + "\",";
