@@ -15,6 +15,7 @@
 #include "ota.h"
 #include "audio_service.h"
 #include "device_state_event.h"
+#include "music_player/music_player.h"
 
 
 #define MAIN_EVENT_SCHEDULE (1 << 0)
@@ -65,6 +66,7 @@ public:
     int GetAgentInterruptMode() const { return agent_interrupt_mode_; }
     void PlaySound(const std::string_view& sound);
     AudioService& GetAudioService() { return audio_service_; }
+    void Close();
 
 #if CONFIG_CONNECTION_TYPE_NERTC
     // photo explain

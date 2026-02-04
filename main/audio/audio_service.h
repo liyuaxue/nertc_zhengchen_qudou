@@ -101,12 +101,15 @@ public:
     void EnableAudioTesting(bool enable);
     void EnableDeviceAec(bool enable);
 
+    bool WaitForPlayCompletion(int timeout_ms);
+
     void SetCallbacks(AudioServiceCallbacks& callbacks);
 
     bool PushPacketToDecodeQueue(std::unique_ptr<AudioStreamPacket> packet, bool wait = false);
     std::unique_ptr<AudioStreamPacket> PopPacketFromSendQueue();
     void PlaySound(const std::string_view& sound);
     bool ReadAudioData(std::vector<int16_t>& data, int sample_rate, int samples);
+    void UpdateLastOutputTime();
 #ifdef CONFIG_USE_AUDIO_CODEC_ENCODE_OPUS
     bool ReadAudioData(std::vector<uint8_t>& data, int sample_rate, int samples);
     void OnAudioInputDecodeForWakeWord();

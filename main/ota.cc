@@ -88,6 +88,7 @@ esp_err_t Ota::CheckVersion() {
     auto http = SetupHttp();
 
     std::string data = board.GetSystemInfoJson();
+    ESP_LOGI(TAG, "ota url: %s deviceId:%s\n", url.c_str(), board.GetBoardName().c_str());
     std::string method = data.length() > 0 ? "POST" : "GET";
     http->SetContent(std::move(data));
 
@@ -103,6 +104,7 @@ esp_err_t Ota::CheckVersion() {
     }
 
     data = http->ReadAll();
+    ESP_LOGI(TAG, "ota data: %s\n", data.c_str());
     http->Close();
 
     // Response: { "firmware": { "version": "1.0.0", "url": "http://" } }
@@ -248,6 +250,17 @@ esp_err_t Ota::CheckVersion() {
             cJSON *interrupt_mode = cJSON_GetObjectItem(pipeline, "interrupt_mode");
             if (cJSON_IsNumber(interrupt_mode)) {
                 agent_interrupt_mode_ = interrupt_mode->valueint;
+            }
+        }
+        cJSON* netease_cloud_music = cJSON_GetObjectItem(agent, "netease_cloud_music");
+        if (cJSON_IsObject(netease_cloud_music)){
+            cJSON *support_music = cJSON_GetObjectItem(netease_cloud_music, "support_music");
+            cJSON *support_play_in_4g = cJSON_GetObjectItem(netease_cloud_music, "support_play_in_4g");
+            if (cJSON_IsBool(support_music)) {
+                support_air_music_player = support_music->valueint;
+            }
+            if (cJSON_IsBool(support_play_in_4g)){
+                support_air_music_in_4G = support_play_in_4g->valueint;
             }
         }
     }

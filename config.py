@@ -55,7 +55,7 @@ def flash_blufi(port, target):
     app_name="blufi_app.bin"
     if target == "esp32-c3":
         app_name="blufi_app_c3.bin"
-    command = f"python -m esptool --chip {target} -p {port} write_flash 0x5B0000 third_party/blufi_app/bin/{app_name}"
+    command = f"python -m esptool --chip {target} -p {port} write_flash 0x630000 third_party/blufi_app/bin/{app_name}"
     print(f"Running blufi flash command: {command}")
     try:
         subprocess.run(command, shell=True, check=True)

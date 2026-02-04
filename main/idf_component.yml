@@ -94,3 +94,7 @@ dependencies:
   idf:
     version: '>=5.4.0'
   # espressif/esp_lcd_touch_st7123: ^1.0.0  # 无触摸屏，移除
+  espressif/esp_audio_simple_player: ^0.9.5
+  chmorgan/esp-libhelix-mp3:
+    version: "*"
+
