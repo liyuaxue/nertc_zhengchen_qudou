@@ -4,7 +4,7 @@
 # CMakeLists in this exact order for cmake to work correctly
 cmake_minimum_required(VERSION 3.16)
 
-set(PROJECT_VER "1.0.3")#基于小智2.0.5版本开发
+set(PROJECT_VER "1.0.4")#基于小智2.0.5版本开发
 
 # Add this line to disable the specific warning
 add_compile_options(-Wno-missing-field-initializers)
