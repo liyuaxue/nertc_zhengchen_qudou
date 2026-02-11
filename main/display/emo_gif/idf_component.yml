@@ -1,0 +1,10 @@
+dependencies:
+  idf:
+    version: '>=5.4.0'
+  lvgl/lvgl: '>=9.0'
+description: GIF表情资源包
+license: MIT
+targets:
+- esp32s3
+
+version: 1.0.0

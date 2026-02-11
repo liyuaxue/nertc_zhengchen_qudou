@@ -1,0 +1,21 @@
+tmp/
+managed_components/
+build/
+.vscode/
+.devcontainer/
+sdkconfig.old
+sdkconfig
+# dependencies.lock - 应该提交以锁定依赖版本，所以不忽略
+.env
+releases/
+main/assets/lang_config.h
+main/mmap_generate_emoji.h
+.DS_Store
+.cache
+*.pyc
+# 允许提交重要的 bin 文件
+*.bin
+!config.bin
+!third_party/blufi_app/bin/blufi_app.bin
+mmap_generate_*.h
+.clangd
