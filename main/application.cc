@@ -465,6 +465,9 @@ void Application::Start() {
     int interrupteMode = ota.GetOtaAgentInterruptMode();
     agent_interrupt_mode_ = interrupteMode;
     aec_mode_ = interrupteMode == 0 ? kAecOff : kAecOnDeviceSide;
+    // Save AEC mode to Settings so GetAppliedOutputVolume() can read it correctly
+    Settings aec_settings("aec", true);
+    aec_settings.SetInt("mode", static_cast<int32_t>(aec_mode_));
 #ifdef CONFIG_USE_MUSIC_PLAYER
     if (ota.GetSupportAirMusicPlayer() && (Board::GetInstance().GetBoardType() != "ml307" || ota.GetSupportAirMusicIn4G())){
         MusicPlayer::GetInstance().Initialize(codec, &audio_service_);
