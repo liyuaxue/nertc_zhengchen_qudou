@@ -144,6 +144,7 @@ bool Assets::Apply() {
             models_list_ = srmodel_load(static_cast<uint8_t*>(ptr));
             if (models_list_ != nullptr) {
                 auto& app = Application::GetInstance();
+                // 检查是否存在mn模型，如果不存在，则加载默认模型
                 if((esp_srmodel_filter(models_list_, ESP_MN_PREFIX, NULL) == nullptr)){
                     esp_srmodel_deinit(models_list_);
                     models_list_ = esp_srmodel_init("model");

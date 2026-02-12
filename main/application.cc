@@ -77,12 +77,35 @@ Application::Application() {
         .skip_unhandled_events = true
     };
     esp_timer_create(&clock_timer_args, &clock_timer_handle_);
+
+    // Create timer for handling "llm image sent" timeout
+    esp_timer_create_args_t llm_image_sent_timer_args = {
+        .callback = [](void* arg) {
+            Application* app = (Application*)arg;
+            app->Schedule([app]() {
+                if (app->device_state_ == kDeviceStateListening) {
+                    ESP_LOGI(TAG, "No response after 'llm image sent', switching to idle state");
+                    app->SetDeviceState(kDeviceStateIdle);
+                    app->audio_service_.PlaySound(Lang::Sounds::OGG_FAILED);
+                }
+            });
+        },
+        .arg = this,
+        .dispatch_method = ESP_TIMER_TASK,
+        .name = "llm_image_sent_timer",
+        .skip_unhandled_events = true
+    };
+    esp_timer_create(&llm_image_sent_timer_args, &llm_image_sent_timer_handle_);
 }
 
 Application::~Application() {
     if (clock_timer_handle_ != nullptr) {
         esp_timer_stop(clock_timer_handle_);
         esp_timer_delete(clock_timer_handle_);
+    }
+    if (llm_image_sent_timer_handle_ != nullptr) {
+        esp_timer_stop(llm_image_sent_timer_handle_);
+        esp_timer_delete(llm_image_sent_timer_handle_);
     }
     vEventGroupDelete(event_group_);
 }
@@ -299,6 +322,7 @@ void Application::ToggleChatState() {
                     }
                     return;
                 }
+                ai_sleep_ = false;
             }
 
             SetListeningMode(aec_mode_ == kAecOff ? kListeningModeAutoStop : kListeningModeRealtime);
@@ -341,6 +365,7 @@ void Application::StartListening() {
                     }
                     return;
                 }
+                ai_sleep_ = false;
             }
 
             SetListeningMode(kListeningModeManualStop);
@@ -509,13 +534,27 @@ void Application::Start() {
         if (strcmp(type->valuestring, "tts") == 0) {
             auto state = cJSON_GetObjectItem(root, "state");
             if (strcmp(state->valuestring, "start") == 0) {
+                // Check if there's an active timer waiting for response after "llm image sent"
+                bool has_active_timer = false;
+                if (llm_image_sent_timer_handle_ != nullptr) {
+                    int64_t timer_time = esp_timer_get_time();
+                    if (esp_timer_is_active(llm_image_sent_timer_handle_)) {
+                        has_active_timer = true;
+                        esp_timer_stop(llm_image_sent_timer_handle_);
+                        ESP_LOGI(TAG, "Received TTS start after 'llm image sent', switching to speaking state");
+                    }
+                }
+
                 current_pedding_speaking_.store(true);
                 if (device_state_ == kDeviceStateIdle || device_state_ == kDeviceStateListening){
                     audio_service_.ResetDecoder(); //这里涉及到任务投递执行，所有resetdecoder需要提前做。不然前面一两帧音频都丢失
                 }
-                Schedule([this]() {
+                Schedule([this, has_active_timer]() {
                     aborted_ = false;
-                    if (device_state_ == kDeviceStateIdle || device_state_ == kDeviceStateListening) {
+                    // If timer was active (waiting for response after "llm image sent") and we're in listening state, switch to speaking
+                    if (has_active_timer && device_state_ == kDeviceStateListening) {
+                        SetDeviceState(kDeviceStateSpeaking);
+                    } else if (device_state_ == kDeviceStateIdle || device_state_ == kDeviceStateListening) {
                         SetDeviceState(kDeviceStateSpeaking);
                     }
                 });
@@ -553,8 +592,21 @@ void Application::Start() {
         } else if (strcmp(type->valuestring, "stt") == 0) {
             auto text = cJSON_GetObjectItem(root, "text");
             if (cJSON_IsString(text)) {
-                ESP_LOGI(TAG, ">> %s", text->valuestring);
-                Schedule([this, message = std::string(text->valuestring)]() {
+                std::string message = text->valuestring;
+                ESP_LOGI(TAG, ">> %s", message.c_str());
+                
+                // Check if this is "llm image sent" message and device is in listening state
+                if (message == "llm image sent" && device_state_ == kDeviceStateListening) {
+                    ESP_LOGI(TAG, "Received 'llm image sent' in listening state, starting 15s timer");
+                    if (llm_image_sent_timer_handle_ != nullptr) {
+                        // Stop any existing timer first
+                        esp_timer_stop(llm_image_sent_timer_handle_);
+                        // Start 15 second timer
+                        esp_timer_start_once(llm_image_sent_timer_handle_, 15 * 1000 * 1000);
+                    }
+                }
+                
+                Schedule([this, message]() {
                     auto display = Board::GetInstance().GetDisplay();
                     if (display != nullptr) {
                         display->SetChatMessage("user", message.c_str());
@@ -562,12 +614,25 @@ void Application::Start() {
                 });
             }
         } else if (strcmp(type->valuestring, "llm") == 0) {
+            // Check if there's an active timer waiting for response after "llm image sent"
+            bool has_active_timer = false;
+            if (llm_image_sent_timer_handle_ != nullptr) {
+                if (esp_timer_is_active(llm_image_sent_timer_handle_)) {
+                    has_active_timer = true;
+                    esp_timer_stop(llm_image_sent_timer_handle_);
+                    ESP_LOGI(TAG, "Received LLM message after 'llm image sent', switching to speaking state");
+                }
+            }
             auto emotion = cJSON_GetObjectItem(root, "emotion");
             if (cJSON_IsString(emotion)) {
-                Schedule([this, emotion_str = std::string(emotion->valuestring)]() {
+                Schedule([this, emotion_str = std::string(emotion->valuestring), has_active_timer]() {
                     auto display = Board::GetInstance().GetDisplay();
                     if (display != nullptr) {
                         display->SetEmotion(emotion_str.c_str());
+                    }
+                    // If timer was active and we're still in listening state, switch to speaking
+                    if (has_active_timer && device_state_ == kDeviceStateListening) {
+                        SetDeviceState(kDeviceStateSpeaking);
                     }
                 });
             }
@@ -707,6 +772,16 @@ void Application::MainEventLoop() {
                 // SystemInfo::PrintTaskList();
                 SystemInfo::PrintHeapStats();
             }
+
+            if (ai_sleep_ && (device_state_ == kDeviceStateIdle || device_state_ == kDeviceStateListening)) {
+                Schedule([this]() {
+                    ESP_LOGI(TAG, "AI sleep mode, close the audio channel");
+                    if (protocol_) {
+                        protocol_->CloseAudioChannel();
+                    }
+                    ai_sleep_ = false;
+                });
+            }
         }
     }
 }
@@ -733,6 +808,7 @@ void Application::OnWakeWordDetected() {
                 audio_service_.EnableWakeWordDetection(true);
                 return;
             }
+            ai_sleep_ = false;
         }
 
         auto wake_word = audio_service_.GetLastWakeWord();
@@ -806,6 +882,7 @@ void Application::SetDeviceState(DeviceState state) {
             display->SetChatMessage("system", "");
             audio_service_.EnableVoiceProcessing(false);
             audio_service_.EnableWakeWordDetection(true);
+            mic_disabled_for_next_listening_ = false;
             break;
         case kDeviceStateConnecting:
             display->SetStatus(Lang::Strings::CONNECTING);

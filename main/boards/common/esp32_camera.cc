@@ -550,8 +550,24 @@ bool Esp32Camera::GetCapturedJpeg(uint8_t*& data, size_t& len) {
 
     // 等待 Task 完成
     int count = 0;
+    const int max_wait_count = 20; 
     while (xSemaphoreTake(param->done_sem, pdMS_TO_TICKS(500)) == pdFALSE) {
-        ESP_LOGW(TAG, "Waiting for encode task, count: %d", ++count);
+        count++;
+        ESP_LOGW(TAG, "Waiting for encode task, count: %d", count);
+        if (count >= max_wait_count) {
+            ESP_LOGE(TAG, "Encode task timeout after 10 seconds, giving up");
+            // 清理资源并返回失败
+            vSemaphoreDelete(param->done_sem);
+            delete param;
+            vQueueDelete(jpeg_queue);
+            // 清理已收集的chunks
+            for (auto& c : chunks) {
+                if (c.data) {
+                    heap_caps_free(c.data);
+                }
+            }
+            return false;
+        }
     }
 
     // 清理资源

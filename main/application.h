@@ -85,6 +85,7 @@ private:
     std::unique_ptr<Protocol> protocol_;
     EventGroupHandle_t event_group_ = nullptr;
     esp_timer_handle_t clock_timer_handle_ = nullptr;
+    esp_timer_handle_t llm_image_sent_timer_handle_ = nullptr;
     volatile DeviceState device_state_ = kDeviceStateUnknown;
     std::atomic<bool> current_pedding_speaking_{false};
     ListeningMode listening_mode_ = kListeningModeAutoStop;

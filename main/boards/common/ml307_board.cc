@@ -8,6 +8,7 @@
 #include <esp_timer.h>
 #include <font_awesome.h>
 #include <opus_encoder.h>
+#include <esp_netif.h>
 
 static const char *TAG = "Ml307Board";
 
@@ -27,6 +28,8 @@ std::string Ml307Board::GetIccid() const {
 }
 
 void Ml307Board::StartNetwork() {
+    ESP_ERROR_CHECK(esp_netif_init());
+
     auto& application = Application::GetInstance();
     auto display = Board::GetInstance().GetDisplay();
     display->SetStatus(Lang::Strings::DETECTING_MODULE);
