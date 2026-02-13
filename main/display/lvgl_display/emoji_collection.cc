@@ -3,6 +3,7 @@
 #include <esp_log.h>
 #include <unordered_map>
 #include <string>
+#include <cstring>
 
 #define TAG "EmojiCollection"
 
@@ -16,7 +17,16 @@ const LvglImage* EmojiCollection::GetEmojiImage(const char* name) {
         return it->second;
     }
 
-    ESP_LOGW(TAG, "Emoji not found: %s", name);
+    ESP_LOGW(TAG, "Emoji not found: %s, using default neutral", name);
+    
+    // 如果找不到表情，尝试使用默认的 neutral 表情
+    if (strcmp(name, "neutral") != 0) {
+        auto neutral_it = emoji_collection_.find("neutral");
+        if (neutral_it != emoji_collection_.end()) {
+            return neutral_it->second;
+        }
+    }
+    
     return nullptr;
 }
 

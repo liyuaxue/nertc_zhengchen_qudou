@@ -88,6 +88,8 @@ private:
     esp_timer_handle_t llm_image_sent_timer_handle_ = nullptr;
     volatile DeviceState device_state_ = kDeviceStateUnknown;
     std::atomic<bool> current_pedding_speaking_{false};
+    // TTS 尾音接收窗口截止时间（微秒时间戳，0 表示无尾巴窗口）
+    std::atomic<int64_t> tts_tail_deadline_us_{0};
     ListeningMode listening_mode_ = kListeningModeAutoStop;
     AecMode aec_mode_ = kAecOff;
     int agent_interrupt_mode_ = -1; // 0:不打断，1:开始说话打断，2:结束说话打断, 3:打断词打断

@@ -759,7 +759,7 @@ void LcdDisplay::SetChatMessage(const char* role, const char* content) {
     if (chat_message_label_ == nullptr) {
         return;
     }
-    
+
     if (!text_mode_) {
         lv_obj_add_flag(chat_message_label_, LV_OBJ_FLAG_HIDDEN);
         if (chat_message_image_ != nullptr) {
@@ -767,26 +767,49 @@ void LcdDisplay::SetChatMessage(const char* role, const char* content) {
         }
         return;
     }
-    std::string content_str(content);
-    if (content_str.rfind("%", 0) == 0) {
-        if (content_str.find("camera.take_photo") != std::string::npos) {
-            lv_label_set_text(chat_message_label_, "正在拍照并分析图片中");
-            return;
-        }
-        return;
-    }
 
-    if (role != nullptr && strcmp(role, "user") == 0) {
+    std::string content_str(content);
+
+    // 通用：隐藏 GIF 图片并显示文字标签
+    auto hide_image_and_show_label = [this]() {
         if (chat_message_image_ != nullptr && !lv_obj_has_flag(chat_message_image_, LV_OBJ_FLAG_HIDDEN)) {
             if (chat_message_gif_controller_) {
                 chat_message_gif_controller_->Stop();
                 chat_message_gif_controller_.reset();
             }
             lv_obj_add_flag(chat_message_image_, LV_OBJ_FLAG_HIDDEN);
+        }
+        if (chat_message_label_ != nullptr) {
             lv_obj_remove_flag(chat_message_label_, LV_OBJ_FLAG_HIDDEN);
         }
+    };
+
+    if (content_str.rfind("%", 0) == 0) {
+        if (content_str.find("camera.take_photo") != std::string::npos) {
+            hide_image_and_show_label();
+            lv_label_set_text(chat_message_label_, "正在拍照并分析图片中");
+            return;
+        }
+        return;
     }
-    
+
+    if(strcmp(content, "llm image sent") == 0) {
+        hide_image_and_show_label();
+        lv_label_set_text(chat_message_label_, "分析图片中...");
+        return;
+    }
+
+    // 在聆听状态时，如果有文字更新，优先显示文字标签
+    DeviceState current_state = Application::GetInstance().GetDeviceState();
+    bool is_listening = (current_state == kDeviceStateListening);
+
+    bool has_text_content = (content != nullptr && strlen(content) > 0 && 
+                             strcmp(content, "llm image sent") != 0);
+
+    if (has_text_content && (is_listening || (role != nullptr && strcmp(role, "user") == 0))) {
+        hide_image_and_show_label();
+    }
+
     lv_label_set_text(chat_message_label_, content);
 }
 

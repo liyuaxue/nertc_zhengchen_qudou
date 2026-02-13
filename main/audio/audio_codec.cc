@@ -63,7 +63,7 @@ int AudioCodec::GetAppliedOutputVolume() const {
     int applied = output_volume_;
     if (mode != 0) {
         // AEC enabled: apply a 0.9 factor with rounding.
-        applied = (applied * 8.5 + 5) / 10;
+        applied = (applied * 8 + 5) / 10;
     }
 
     if (applied < 0) applied = 0;

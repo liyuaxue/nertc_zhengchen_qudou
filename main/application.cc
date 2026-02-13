@@ -468,6 +468,14 @@ void Application::Start() {
     // Save AEC mode to Settings so GetAppliedOutputVolume() can read it correctly
     Settings aec_settings("aec", true);
     aec_settings.SetInt("mode", static_cast<int32_t>(aec_mode_));
+    if (codec) {
+        Settings audio_settings("audio", false);
+        int saved_volume = audio_settings.GetInt("output_volume", codec->output_volume());
+        if (saved_volume <= 0) {
+            saved_volume = 10;
+        }
+        codec->SetOutputVolume(saved_volume);
+    }
 #ifdef CONFIG_USE_MUSIC_PLAYER
     if (ota.GetSupportAirMusicPlayer() && (Board::GetInstance().GetBoardType() != "ml307" || ota.GetSupportAirMusicIn4G())){
         MusicPlayer::GetInstance().Initialize(codec, &audio_service_);
@@ -502,7 +510,14 @@ void Application::Start() {
         xEventGroupSetBits(event_group_, MAIN_EVENT_ERROR);
     });
     protocol_->OnIncomingAudio([this](std::unique_ptr<AudioStreamPacket> packet) {
-        if (device_state_ == kDeviceStateSpeaking|| current_pedding_speaking_.load()) { 
+        // 允许在 speaking / pending speaking 以及 TTS stop 后的“尾巴窗口”内继续接收远端音频
+        int64_t now = esp_timer_get_time();
+        int64_t tail_deadline = tts_tail_deadline_us_.load();
+
+        if (device_state_ == kDeviceStateSpeaking ||
+            current_pedding_speaking_.load() ||
+            (tail_deadline > 0 && now <= tail_deadline)) {
+
             std::unique_ptr<AudioStreamPacket> reference_packet = nullptr;
 #if CONFIG_CONNECTION_TYPE_NERTC && CONFIG_USE_NERTC_SERVER_AEC
             reference_packet = std::make_unique<AudioStreamPacket>();
@@ -539,16 +554,19 @@ void Application::Start() {
             if (strcmp(state->valuestring, "start") == 0) {
                 // Check if there's an active timer waiting for response after "llm image sent"
                 bool has_active_timer = false;
-                if (llm_image_sent_timer_handle_ != nullptr) {
-                    int64_t timer_time = esp_timer_get_time();
-                    if (esp_timer_is_active(llm_image_sent_timer_handle_)) {
-                        has_active_timer = true;
-                        esp_timer_stop(llm_image_sent_timer_handle_);
-                        ESP_LOGI(TAG, "Received TTS start after 'llm image sent', switching to speaking state");
-                    }
+            if (llm_image_sent_timer_handle_ != nullptr) {
+                int64_t timer_time = esp_timer_get_time();
+                if (esp_timer_is_active(llm_image_sent_timer_handle_)) {
+                    has_active_timer = true;
+                    esp_timer_stop(llm_image_sent_timer_handle_);
+                    ESP_LOGI(TAG, "Received TTS start after 'llm image sent', switching to speaking state");
                 }
+            }
 
-                current_pedding_speaking_.store(true);
+            // 开始新的 TTS，清空旧的尾巴窗口
+            tts_tail_deadline_us_.store(0);
+
+            current_pedding_speaking_.store(true);
                 if (device_state_ == kDeviceStateIdle || device_state_ == kDeviceStateListening){
                     audio_service_.ResetDecoder(); //这里涉及到任务投递执行，所有resetdecoder需要提前做。不然前面一两帧音频都丢失
                 }
@@ -562,6 +580,10 @@ void Application::Start() {
                     }
                 });
             } else if (strcmp(state->valuestring, "stop") == 0) {
+                // 设置 TTS 尾巴接收窗口400ms
+                int64_t now = esp_timer_get_time();
+                tts_tail_deadline_us_.store(now + 400 * 1000);
+
                 Schedule([this]() {
                     if (device_state_ == kDeviceStateSpeaking) {
                         if (listening_mode_ == kListeningModeManualStop) {
@@ -569,11 +591,11 @@ void Application::Start() {
                         } else {
                             // SetDeviceState(kDeviceStateListening);
                             bool wait = false;
-                            if(!aborted_){
+                            if (!aborted_) {
                                 wait = true;
                                 audio_service_.WaitForPlayCompletion(200);
                             }
-                            if(device_state_ == kDeviceStateSpeaking && (!wait || (wait && !aborted_))){
+                            if (device_state_ == kDeviceStateSpeaking && (!wait || (wait && !aborted_))) {
                                 SetDeviceState(kDeviceStateListening);
                             }
 
@@ -584,7 +606,18 @@ void Application::Start() {
                 auto text = cJSON_GetObjectItem(root, "text");
                 if (cJSON_IsString(text)) {
                     ESP_LOGI(TAG, "<< %s", text->valuestring);
-                    Schedule([this, message = std::string(text->valuestring)]() {
+                    
+                    // 检查是否有等待响应的定时器
+                    bool has_active_timer = false;
+                    if (llm_image_sent_timer_handle_ != nullptr) {
+                        if (esp_timer_is_active(llm_image_sent_timer_handle_)) {
+                            has_active_timer = true;
+                            esp_timer_stop(llm_image_sent_timer_handle_);
+                            ESP_LOGI(TAG, "Received sentence_start after 'llm image sent', will switch to speaking when TTS starts");
+                        }
+                    }
+                    
+                    Schedule([this, message = std::string(text->valuestring), has_active_timer]() {
                         auto display = Board::GetInstance().GetDisplay();
                         if (display != nullptr) {
                             display->SetChatMessage("assistant", message.c_str());
