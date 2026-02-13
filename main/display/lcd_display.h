@@ -18,6 +18,7 @@
 // Forward declaration
 class ClockDesktopUI;
 class SettingsPageUI;
+class MusicPlayerUI;
 
 class LcdDisplay : public LvglDisplay {
 protected:
@@ -48,6 +49,7 @@ protected:
     std::unique_ptr<LvglImage> preview_image_cached_ = nullptr;
     ClockDesktopUI* clock_ui_ = nullptr;
     SettingsPageUI* settings_page_ui_ = nullptr;
+    MusicPlayerUI* music_player_ui_ = nullptr;
     
     // 文字模式相关
     bool text_mode_ = true;  
@@ -87,6 +89,9 @@ public:
     
     // Get settings page UI
     SettingsPageUI* GetSettingsPageUI() { return settings_page_ui_; }
+    
+    // Get music player UI
+    MusicPlayerUI* GetMusicPlayerUI() { return music_player_ui_; }
     
     // Set text mode (true for text mode, false for emotion mode)
     void SetTextMode(bool text_mode);

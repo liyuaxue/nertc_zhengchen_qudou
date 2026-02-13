@@ -6,6 +6,7 @@
 #include "assets/lang_config.h"
 #include "clock_desktop_ui.h"
 #include "settings_page_ui.h"
+#include "music_player_ui.h"
 
 #include <vector>
 #include <font_awesome.h>
@@ -230,6 +231,9 @@ SpiLcdDisplay::SpiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
     
     // 初始化设置页面UI
     settings_page_ui_ = new SettingsPageUI(this);
+    
+    // 初始化音乐播放器UI
+    music_player_ui_ = new MusicPlayerUI(this);
 }
 
 RgbLcdDisplay::RgbLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel,
@@ -297,6 +301,9 @@ RgbLcdDisplay::RgbLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_h
     
     // 初始化设置页面UI
     settings_page_ui_ = new SettingsPageUI(this);
+    
+    // 初始化音乐播放器UI
+    music_player_ui_ = new MusicPlayerUI(this);
 }
 
 MipiLcdDisplay::MipiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel,
@@ -354,6 +361,7 @@ MipiLcdDisplay::MipiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel
     SetupUI();
     
     clock_ui_ = new ClockDesktopUI(this);
+    music_player_ui_ = new MusicPlayerUI(this);
 }
 
 LcdDisplay::~LcdDisplay() {
@@ -362,6 +370,11 @@ LcdDisplay::~LcdDisplay() {
     if (settings_page_ui_ != nullptr) {
         delete settings_page_ui_;
         settings_page_ui_ = nullptr;
+    }
+    
+    if (music_player_ui_ != nullptr) {
+        delete music_player_ui_;
+        music_player_ui_ = nullptr;
     }
     
     if (clock_ui_ != nullptr) {
@@ -1212,6 +1225,7 @@ void LcdDisplay::UpdateUILayout() {
     }
     
     if (text_mode_) {
+        lv_obj_set_style_bg_opa(emoji_box_, LV_OPA_TRANSP, 0);
         lv_obj_set_size(emoji_box_, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
         lv_obj_center(emoji_box_);
         if (emoji_image_ != nullptr) {
@@ -1230,6 +1244,8 @@ void LcdDisplay::UpdateUILayout() {
         int status_bar_height = top_bar_ != nullptr ? lv_obj_get_height(top_bar_) : 0;
         lv_obj_set_size(emoji_box_, LV_HOR_RES, LV_VER_RES - status_bar_height);
         lv_obj_align(emoji_box_, LV_ALIGN_BOTTOM_LEFT, 0, 0);
+        lv_obj_set_style_bg_opa(emoji_box_, LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_color(emoji_box_, lv_color_hex(0x000000), 0);
         if (emoji_image_ != nullptr) {
             lv_obj_set_size(emoji_image_, LV_HOR_RES, LV_VER_RES - status_bar_height);
             lv_obj_align(emoji_image_, LV_ALIGN_CENTER, 0, 0);
@@ -1263,6 +1279,15 @@ void LcdDisplay::SetTextModeInternal(bool text_mode, bool save_to_settings) {
     if (save_to_settings) {
         Settings settings("display", true);
         settings.SetBool("text_mode", text_mode_);
+    }
+
+    {
+        DisplayLockGuard lock(this);
+        auto screen = lv_screen_active();
+        auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
+        if (!text_mode_) {
+            SetTheme(LvglThemeManager::GetInstance().GetTheme("dark"));
+        }
     }
     
     UpdateUILayout();

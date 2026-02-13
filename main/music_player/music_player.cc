@@ -4,15 +4,12 @@
 #include <cmath>
 #include "mcp_server.h"
 #include "application.h"
-// 工具：把字节流拆成 16-bit 采样
-static void deinterleave_int16(const uint8_t* src, int16_t* dstL, int16_t* dstR, int samples) {
-    const int16_t* s = reinterpret_cast<const int16_t*>(src);
-    for (int i = 0; i < samples; ++i) {
-        dstL[i] = s[i * 2];
-        dstR[i] = s[i * 2 + 1];
-    }
-}
+#include "board.h"
+#include "music_player_ui.h"
+#include "display/lcd_display.h"
+#include "display/lvgl_display/lvgl_theme.h"
 
+bool MusicPlayer::music_ui_active_ = false;
 // 工具：单声道 → 目标采样率
 static std::vector<int16_t> resample(const std::vector<int16_t>& in,
                                       int inRate, int outRate) {
@@ -107,8 +104,26 @@ void MusicPlayer::PlayStateCallback(music_player_state_t state){
     current_state_ = state;
     ESP_LOGI("MusicPlayer", "Music player state changed: %d", state);
     if(current_state_ == MUSIC_PLAYER_STATE_FINISHED || current_state_ == MUSIC_PLAYER_STATE_ERROR){
+        bool continued = false;
         if(!CurrentPlayingLastMusic() && is_air_music_playing_){
-            PlayNextAirMusic();
+            // 在线音乐且不是最后一首，继续播放下一首，不关闭 UI
+            continued = PlayNextAirMusic();
+        }
+
+        if (!continued) {
+            // 所有音乐播放结束或出错，隐藏音乐 UI 并清除标记
+            MusicPlayer::SetMusicUIActive(false);
+            Application::GetInstance().Schedule([]() {
+                auto* display = Board::GetInstance().GetDisplay();
+                auto* lcd_display = dynamic_cast<LcdDisplay*>(display);
+                if (lcd_display == nullptr) {
+                    return;
+                }
+                auto* music_ui = lcd_display->GetMusicPlayerUI();
+                if (music_ui != nullptr && music_ui->IsVisible()) {
+                    music_ui->Hide();
+                }
+            });
         }
     }
 }
@@ -132,6 +147,60 @@ int MusicPlayer::DataCallback(uint8_t *data, int data_size){
     codec_->OutputData(pcm);
     audio_service_->UpdateLastOutputTime();
     return data_size;
+}
+
+// 帮助函数：根据当前歌曲信息刷新音乐播放 UI
+static void UpdateMusicPlayerUI(const MusicInfo& info) {
+    ESP_LOGI("MusicPlayer", "UpdateMusicPlayerUI title='%s' artist='%s'",
+             info.name.c_str(),
+             info.artist.c_str());
+    Application::GetInstance().Schedule([info]() {
+        auto* display = Board::GetInstance().GetDisplay();
+        auto* lcd_display = dynamic_cast<LcdDisplay*>(display);
+        if (lcd_display == nullptr) {
+            return;
+        }
+        auto* music_ui = lcd_display->GetMusicPlayerUI();
+        if (music_ui == nullptr) {
+            return;
+        }
+        auto* theme = static_cast<LvglTheme*>(lcd_display->GetTheme());
+        if (theme != nullptr) {
+            music_ui->SetTheme(theme);
+        }
+        std::string title = info.name;
+        std::string artist = !info.artist.empty() ? info.artist : info.album;
+        music_ui->SetSongInfo(title, artist);
+        music_ui->SetTimes("00:00", "");   // 目前没有总时长信息
+        music_ui->SetProgress(0.0f);
+        music_ui->Show();
+    });
+    // 标记音乐 UI 为激活状态
+    MusicPlayer::SetMusicUIActive(true);
+}
+
+void MusicPlayer::InterruptPlay() {
+    if (!initialed) {
+        return;
+    }
+    StopAirPlay();
+    if (current_state_ == music_player_state_t::MUSIC_PLAYER_STATE_PLAYING) {
+        ESP_LOGI("MusicPlayer", "InterruptPlay: stopping current music playback");
+        StopPlay();
+    }
+    // 中断播放时，关闭音乐 UI 标记并隐藏音乐界面
+    MusicPlayer::SetMusicUIActive(false);
+    Application::GetInstance().Schedule([]() {
+        auto* display = Board::GetInstance().GetDisplay();
+        auto* lcd_display = dynamic_cast<LcdDisplay*>(display);
+        if (lcd_display == nullptr) {
+            return;
+        }
+        auto* music_ui = lcd_display->GetMusicPlayerUI();
+        if (music_ui != nullptr && music_ui->IsVisible()) {
+            music_ui->Hide();
+        }
+    });
 }
 
 
@@ -208,6 +277,19 @@ int MusicPlayer::Initialize(AudioCodec* codec, AudioService* audio_service, std:
         [this](const PropertyList& properties) -> ReturnValue {
             ESP_LOGI("MusicPlayer", "Received stop_music tool call");
             this->StopAirPlay();
+            MusicPlayer::SetMusicUIActive(false);
+            // 停止播放时隐藏音乐 UI
+            Application::GetInstance().Schedule([]() {
+                auto* display = Board::GetInstance().GetDisplay();
+                auto* lcd_display = dynamic_cast<LcdDisplay*>(display);
+                if (lcd_display == nullptr) {
+                    return;
+                }
+                auto* music_ui = lcd_display->GetMusicPlayerUI();
+                if (music_ui != nullptr && music_ui->IsVisible()) {
+                    music_ui->Hide();
+                }
+            });
             return R"({"operator":"success","message":"Music stopped"})";
         });
     McpServer::GetInstance().AddTool("self.music_player.next_music", 
@@ -235,6 +317,54 @@ int MusicPlayer::Initialize(AudioCodec* codec, AudioService* audio_service, std:
             return R"({"operator":"fail","message":"Playing previous music"})";
         });
     return 0;
+}
+
+bool MusicPlayer::PlayAirMusicByIndex(int index){
+    MusicInfo music = music_list_manager_.GetAirMusicByIndex(index);
+    if(!music.uri.empty()){
+        Play(music.uri.c_str());
+        if (is_air_music_playing_) {
+            UpdateMusicPlayerUI(music);
+        }
+        return true;
+    }
+    return false;
+}
+
+bool MusicPlayer::PlayCurrentAirMusic(){
+    MusicInfo music = music_list_manager_.GetCurrentAirMusic();
+    if(!music.uri.empty()){
+        Play(music.uri.c_str());
+        if (is_air_music_playing_) {
+            UpdateMusicPlayerUI(music);
+        }
+        return true;
+    }
+    return false;
+}
+
+bool MusicPlayer::PlayNextAirMusic(){
+    MusicInfo music = music_list_manager_.GetNextAirMusic();
+    if(!music.uri.empty()){
+        Play(music.uri.c_str());
+        if (is_air_music_playing_) {
+            UpdateMusicPlayerUI(music);
+        }
+        return true;
+    }
+    return false;
+}
+
+bool MusicPlayer::PlayPreviousAirMusic(){
+    MusicInfo music = music_list_manager_.GetPreviousAirMusic();
+    if(!music.uri.empty()){
+        Play(music.uri.c_str());
+        if (is_air_music_playing_) {
+            UpdateMusicPlayerUI(music);
+        }
+        return true;
+    }
+    return false;
 }
 
 void MusicPlayer::Play(const char* mp3_path){

@@ -5,6 +5,7 @@
 #include "board.h"
 #include "application.h"
 #include "boards/zhengchen-qudou/alarm.h"
+#include "music_player/music_player.h"
 
 #include <esp_log.h>
 #include <esp_timer.h>
@@ -91,6 +92,14 @@ void ClockDesktopUI::Show() {
         ESP_LOGI(TAG, "Camera preview is active, cannot show clock UI");
         return;
     }
+
+    // 如果音乐播放 UI 处于激活状态，则不显示时钟 UI（保持只显示音乐 UI）
+#ifdef CONFIG_USE_MUSIC_PLAYER
+    if (MusicPlayer::IsMusicUIActive()) {
+        ESP_LOGI(TAG, "Music UI is active, cannot show clock UI");
+        return;
+    }
+#endif
     
     // 检查设置UI是否正在显示，如果是则禁止显示时钟UI
     auto* lcd_display = dynamic_cast<LcdDisplay*>(display_);
@@ -752,6 +761,20 @@ void ClockDesktopUI::CheckChargingAndStandbyState() {
             return;  // 禁止显示时钟UI
         }
     }
+
+#ifdef CONFIG_USE_MUSIC_PLAYER
+    // 如果音乐 UI 正在激活，同样不允许自动显示时钟 UI
+    if (MusicPlayer::IsMusicUIActive()) {
+        if (delay_show_timer_ != nullptr && delay_show_timer_started_) {
+            esp_timer_stop(delay_show_timer_);
+            delay_show_timer_started_ = false;
+        }
+        if (is_visible_ && auto_shown_by_charging_) {
+            Hide();
+        }
+        return;
+    }
+#endif
     
     auto& board = Board::GetInstance();
     auto& app = Application::GetInstance();

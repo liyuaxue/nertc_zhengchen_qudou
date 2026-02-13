@@ -34,6 +34,9 @@ void AudioCodec::Start() {
         output_volume_ = 10;
     }
 
+    Settings aec_settings("aec", false);
+    aec_mode_cached_ = aec_settings.GetInt("mode", 0); // 0 == kAecOff
+
     if (tx_handle_ != nullptr) {
         ESP_ERROR_CHECK(i2s_channel_enable(tx_handle_));
     }
@@ -55,13 +58,11 @@ void AudioCodec::SetOutputVolume(int volume) {
     settings.SetInt("output_volume", output_volume_);
 }
 
-int AudioCodec::GetAppliedOutputVolume() const {
-    // Persisted volume is the user-facing value; the applied value is adjusted by AEC mode.
-    Settings aec_settings("aec", false);
-    int mode = aec_settings.GetInt("mode", 0); // 0 == kAecOff
-
+int AudioCodec::GetAppliedOutputVolume() {
+    // Persisted volume is the user-facing value; the applied value是 output_volume_；
+    // 实际应用值根据已缓存的 AEC 模式做一次缩放，避免在实时路径访问 NVS。
     int applied = output_volume_;
-    if (mode != 0) {
+    if (aec_mode_cached_ != 0) {
         // AEC enabled: apply a 0.9 factor with rounding.
         applied = (applied * 8 + 5) / 10;
     }

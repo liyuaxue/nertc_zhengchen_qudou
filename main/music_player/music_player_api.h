@@ -44,6 +44,8 @@ void mp3_player_set_position(unsigned int position);
 
 void mp3_player_deinit();
 
+void music_player_on_estimated_duration(void* ctx, int total_sec);
+
 // void mp3_player_set_volume(int volume);
 
 // int mp3_player_get_volume();

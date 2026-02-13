@@ -157,38 +157,10 @@ public:
     }
 public:
     int Initialize(AudioCodec* codec, AudioService* audio_service, std::string sd_card_music_path = "");
-    bool PlayAirMusicByIndex(int index){
-        MusicInfo music = music_list_manager_.GetAirMusicByIndex(index);
-        if(!music.uri.empty()){
-            Play(music.uri.c_str());
-            return true;
-        }
-        return false;
-    }
-    bool PlayCurrentAirMusic(){
-        MusicInfo music = music_list_manager_.GetCurrentAirMusic();
-        if(!music.uri.empty()){
-            Play(music.uri.c_str());
-            return true;
-        }
-        return false;
-    }
-    bool PlayNextAirMusic(){
-        MusicInfo music = music_list_manager_.GetNextAirMusic();
-        if(!music.uri.empty()){
-            Play(music.uri.c_str());
-            return true;
-        }
-        return false;
-    }
-    bool PlayPreviousAirMusic(){
-        MusicInfo music = music_list_manager_.GetPreviousAirMusic();
-        if(!music.uri.empty()){
-            Play(music.uri.c_str());
-            return true;
-        }
-        return false;
-    }
+    bool PlayAirMusicByIndex(int index);
+    bool PlayCurrentAirMusic();
+    bool PlayNextAirMusic();
+    bool PlayPreviousAirMusic();
 
     void UpdateAirMusicListAndPlay(const std::vector<MusicInfo>& music_list, bool play_now);
 
@@ -202,20 +174,15 @@ public:
     bool CurrentPlayingLastMusic(){
         return music_list_manager_.CurrentLastMusicOnList(is_air_music_playing_);
     }
+
+    // 音乐播放 UI 是否处于激活状态（用于控制其它 UI 显示）
+    static bool IsMusicUIActive() { return music_ui_active_; }
+    static void SetMusicUIActive(bool active) { music_ui_active_ = active; }
 public:
     int DataCallback(uint8_t *data, int data_size);
     void InfoCallback(int sample_rate, int channels, int bits);
     void PlayStateCallback(music_player_state_t state);
-    void InterruptPlay(){
-        if(!initialed){
-            return;
-        }
-        StopAirPlay();
-        if(current_state_ == music_player_state_t::MUSIC_PLAYER_STATE_PLAYING){
-            ESP_LOGI("MusicPlayer", "InterruptPlay: stopping current music playback");
-            StopPlay();
-        }
-    }
+    void InterruptPlay();
 private:
     MusicPlayer();
     ~MusicPlayer() {}
@@ -235,5 +202,6 @@ private:
     std::mutex call_back_mutex_;
     bool initialed = false;
     Mp3OnlinePlayer mp3_online_player_;
+    static bool music_ui_active_;
 };
 #endif //MUSIC_PLAYER_H

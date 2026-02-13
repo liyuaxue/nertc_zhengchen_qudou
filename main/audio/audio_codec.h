@@ -36,7 +36,7 @@ public:
     inline float input_gain() const { return input_gain_; }
     inline bool input_enabled() const { return input_enabled_; }
     inline bool output_enabled() const { return output_enabled_; }
-    int GetAppliedOutputVolume() const;
+    int GetAppliedOutputVolume();
 
 protected:
     i2s_chan_handle_t tx_handle_ = nullptr;
@@ -52,6 +52,9 @@ protected:
     int output_channels_ = 1;
     int output_volume_ = 70;
     float input_gain_ = 0.0;
+
+    // 缓存的 AEC 模式（避免在实时音频路径中访问 NVS）
+    int aec_mode_cached_ = 0;
 
     virtual int Read(int16_t* dest, int samples) = 0;
     virtual int Write(const int16_t* data, int samples) = 0;

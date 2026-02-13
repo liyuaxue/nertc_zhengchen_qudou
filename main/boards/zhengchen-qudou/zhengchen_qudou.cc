@@ -72,7 +72,7 @@ private:
     bool is_pressed_;
     esp_timer_handle_t timer_handle_;
     uint32_t debounce_count_;
-    static constexpr uint32_t DEBOUNCE_THRESHOLD = 1; 
+    static constexpr uint32_t DEBOUNCE_THRESHOLD = 0; 
 
     std::function<void()> on_click_;
 
