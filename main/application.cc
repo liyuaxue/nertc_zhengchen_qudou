@@ -718,6 +718,15 @@ void Application::Start() {
                 ESP_LOGW(TAG, "Invalid custom message format: missing payload");
             }
 #endif
+        } else if (strcmp(type->valuestring, "app") == 0) {
+            auto payload = cJSON_GetObjectItem(root, "payload");
+            if (cJSON_IsObject(payload)) {
+                cJSON* message = cJSON_GetObjectItem(payload, "message");
+                cJSON* subtype = cJSON_GetObjectItem(payload, "type");
+                if (cJSON_IsString(subtype) && cJSON_IsString(message)) {
+                    ESP_LOGI(TAG, "app subtype: %s message: %s\n", subtype->valuestring, message->valuestring);
+                }
+            }
         } else {
             ESP_LOGW(TAG, "Unknown message type: %s", type->valuestring);
         }

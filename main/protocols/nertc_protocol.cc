@@ -22,7 +22,7 @@
 #define UID 6669
 #define USE_SAFE_MODE 0
 #define JOIN_EVENT (1 << 0)
-
+#define START_AI_EVENT (1 << 1)
 
 static const char* const RTC_CALL_STATE_STRINGS[] = {
     "idle",
@@ -375,6 +375,8 @@ bool NeRtcProtocol::OpenAudioChannel(const std::string& wake_word) {
             return false;
         }
     }
+
+    xEventGroupWaitBits(event_group_, START_AI_EVENT, pdTRUE, pdFALSE, pdMS_TO_TICKS(2000)); //最长阻塞2秒
 
     if (on_audio_channel_opened_ != nullptr) {
         on_audio_channel_opened_();
@@ -756,6 +758,8 @@ void NeRtcProtocol::OnUserJoined(const nertc_sdk_callback_context_t* ctx, const 
     if (user && user->type == NERTC_SDK_USER_SIP) {
         Board::GetInstance().GetDisplay()->SetEmotionForce("call", true);
     }
+
+    xEventGroupSetBits(instance->event_group_, START_AI_EVENT);
 }
 
 void NeRtcProtocol::OnUserLeft(const nertc_sdk_callback_context_t* ctx, const nertc_sdk_user_info* user, int reason) {
@@ -959,6 +963,17 @@ void NeRtcProtocol::OnAiData(const nertc_sdk_callback_context_t* ctx, nertc_sdk_
         });
 #endif
         cJSON_Delete(data_json);
+    } else if (strncmp(type_str, "textToImg", type_len) == 0) {
+        cJSON* data_json = cJSON_Parse(data_str);
+        if (!data_json) {
+            ESP_LOGE(TAG, "Failed to parse JSON data");
+            return;
+        }
+        cJSON* app_json = cJSON_CreateObject();
+        cJSON_AddStringToObject(app_json, "type", "app");
+        cJSON_AddItemToObject(app_json, "payload", data_json);
+        if (instance->on_incoming_json_) instance->on_incoming_json_(app_json);
+        cJSON_Delete(app_json);
     }
 }
 
