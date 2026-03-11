@@ -75,6 +75,10 @@ public:
 
     // ai sleep
     void SetAISleep();
+
+    void ReadNertcConfig();
+    bool GetNertcTestMode() const { return enable_test_mode_; }
+    std::string GetAppkey() const { return appkey_; }
 #endif
 private:
     Application();
@@ -103,6 +107,8 @@ private:
     TaskHandle_t main_event_loop_task_handle_ = nullptr;
 
     bool ai_sleep_ = false;
+    bool enable_test_mode_ = false;
+    std::string appkey_;
     bool mic_disabled_for_next_listening_ = false;
 
     void OnWakeWordDetected();
