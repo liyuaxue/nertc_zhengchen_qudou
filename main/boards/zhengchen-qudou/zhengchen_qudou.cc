@@ -336,6 +336,7 @@ private:
 
             auto& app = Application::GetInstance();
             if(app.GetDeviceState()== kDeviceStateListening || app.GetDeviceState()== kDeviceStateSpeaking) {
+                app.AbortSpeaking(kAbortReasonNone);
                 app.SetDeviceState(kDeviceStateIdle);
                 vTaskDelay(pdMS_TO_TICKS(200));
             }
