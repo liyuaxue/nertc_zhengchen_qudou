@@ -144,7 +144,7 @@ bool NertcAfeWakeWord::Initialize(AudioCodec* codec, srmodel_list_t* models_list
     }
 
     config.user_data = this;
-    std::string device_id = Board::GetInstance().GetBoardName();
+    std::string device_id = Board::GetInstance().GetDeviceId();
     config.deviceId = device_id.c_str();
     cJSON* config_json = NeRtcProtocol::ReadConfigJson();
     std::string custom_config_string;
