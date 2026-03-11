@@ -2,6 +2,7 @@
 #include "system_info.h"
 #include "settings.h"
 #include "assets/lang_config.h"
+#include "application.h"
 
 #include <cJSON.h>
 #include <esp_log.h>
@@ -46,6 +47,13 @@ std::string Ota::GetCheckVersionUrl() {
     if (url.empty()) {
         url = CONFIG_OTA_URL;
     }
+
+#if CONFIG_CONNECTION_TYPE_NERTC
+    auto& application = Application::GetInstance();
+    if (!application.GetAppkey().empty())
+        url += "?appkey=" + application.GetAppkey();
+#endif
+
     return url;
 }
 
@@ -88,7 +96,7 @@ esp_err_t Ota::CheckVersion() {
     auto http = SetupHttp();
 
     std::string data = board.GetSystemInfoJson();
-    ESP_LOGI(TAG, "ota url: %s deviceId:%s\n", url.c_str(), board.GetBoardName().c_str());
+    ESP_LOGI(TAG, "ota url: %s deviceId:%s\n", url.c_str(), board.GetDeviceId().c_str());
     std::string method = data.length() > 0 ? "POST" : "GET";
     http->SetContent(std::move(data));
 

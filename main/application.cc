@@ -459,6 +459,9 @@ void Application::Start() {
     // Check for new assets version
     CheckAssetsVersion();
 
+    // read nertc config file
+    ReadNertcConfig();
+
     // Check for new firmware version or get the MQTT broker address
     Ota ota;
     CheckNewVersion(ota);
@@ -1240,6 +1243,34 @@ void Application::SetAISleep() {
     }
 
     protocol_->SetAISleep();
+}
+
+void Application::ReadNertcConfig() {
+#if NERTC_ENABLE_CONFIG_FILE
+    if (!NeRtcProtocol::MountFileSystem()) {
+        ESP_LOGE(TAG, "Failed to initialize file system");
+        return;
+    }
+
+    auto* config_json = NeRtcProtocol::ReadConfigJson();
+    if(config_json) {
+        cJSON* custom_config = cJSON_GetObjectItem(config_json, "custom_config");
+        if (custom_config && cJSON_IsObject(custom_config)) {
+            cJSON* test_mode = cJSON_GetObjectItem(custom_config, "test_mode");
+            if(test_mode && cJSON_IsBool(test_mode)) {
+                enable_test_mode_ = (test_mode->valueint ? true : false);
+                ESP_LOGI(TAG, "local config set test mode to %d", enable_test_mode_ ? 1 : 0);
+            }
+        }
+        cJSON* appkey_json = cJSON_GetObjectItem(config_json, "appkey");
+        if (appkey_json && cJSON_IsString(appkey_json)) {
+            appkey_ = appkey_json->valuestring;
+        }
+        cJSON_Delete(config_json);
+    } else{
+        ESP_LOGW(TAG, "no local config file");
+    }
+#endif
 }
 
 void Application::Close() {
