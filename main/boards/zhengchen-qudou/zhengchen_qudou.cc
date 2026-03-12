@@ -548,7 +548,7 @@ private:
         config.jpeg_quality = 9;             
         config.fb_count = 2;                 // 增加帧缓冲数量，提供更平滑的预览
         config.fb_location = CAMERA_FB_IN_PSRAM;
-        config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;  // 按顺序获取帧，避免跳跃
+        config.grab_mode = CAMERA_GRAB_LATEST; 
 
         camera_ = new Esp32Camera(config);
         
