@@ -25,6 +25,7 @@ FILE_MAP = {
     "ota_0":  "build/xiaozhi.bin",
     "blufi":  "third_party/blufi_app/bin/blufi_app.bin",
     "assets": "main/assets.bin",
+    "model":  "build/srmodels/srmodels.bin",
 }
 
 # 检查文件是否存在
