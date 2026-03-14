@@ -53,7 +53,10 @@ void AfeAudioProcessor::Initialize(AudioCodec* codec, int frame_duration_ms, srm
         afe_config->ns_init = false;
     }
 
-    afe_config->agc_init = false;
+    afe_config->agc_init = true;
+    afe_config->agc_mode = AFE_AGC_MODE_WEBRTC; 
+    afe_config->agc_target_level_dbfs = -5; // -9 ～ 0.值越大，agc 的反应越快，但是容易把有噪声，让 asr 识别错误。
+    afe_config->agc_compression_gain_db = 9;// 向上拉伸 9 分贝，同样，值越大，越容易失真
     afe_config->memory_alloc_mode = AFE_MEMORY_ALLOC_MORE_PSRAM;
 
 #ifdef CONFIG_USE_DEVICE_AEC
