@@ -54,6 +54,7 @@
 struct AudioServiceCallbacks {
     std::function<void(void)> on_send_queue_available;
     std::function<void(const std::string&)> on_wake_word_detected;
+    std::function<void(const std::vector<std::string>&, const std::vector<std::string>&)> on_wake_word_target_updated;
     std::function<void(bool)> on_vad_change;
     std::function<void(void)> on_audio_testing_queue_full;
 };
@@ -117,6 +118,8 @@ public:
 
     void ResetDecoder();
     void SetModelsList(srmodel_list_t* models_list);
+    const std::vector<std::string>& GetWakeWordTargets() const { return wake_word_targets_; }
+    const std::vector<std::string>& GetOriginAwakens() const { return origin_awakens_; }
 
     inline int opus_frame_duration() const { return opus_frame_duration_; }
     void EnableMicInput(bool enable);
@@ -163,6 +166,8 @@ private:
 
     bool wake_word_initialized_ = false;
     bool audio_processor_initialized_ = false;
+    std::vector<std::string> wake_word_targets_;
+    std::vector<std::string> origin_awakens_;
     bool voice_detected_ = false;
     bool service_stopped_ = true;
     bool audio_input_need_warmup_ = false;

@@ -27,7 +27,11 @@ public:
     bool Initialize(AudioCodec* codec, srmodel_list_t* models_list);
     void Feed(const std::vector<int16_t>& data);
     void OnWakeWordDetected(std::function<void(const std::string& wake_word)> callback);
+    void OnWakeWordTargetUpdated(
+        std::function<void(const std::vector<std::string>& wake_words, const std::vector<std::string>& origin_awakens)> callback) override;
     void DoCallBack(std::string& wake_word);
+    void DoWakeWordTargetUpdatedCallback(const std::vector<std::string>& wake_words,
+                                         const std::vector<std::string>& origin_awakens);
     void Start();
     void Stop();
     size_t GetFeedSize();
@@ -39,6 +43,8 @@ private:
     nertc_wakeup_sdk_t nertc_wake_word_ = nullptr;
     bool task_created_ = false;
     std::function<void(const std::string& wake_word)> wake_up_call_back_;
+    std::function<void(const std::vector<std::string>& wake_words, const std::vector<std::string>& origin_awakens)>
+        wake_word_target_updated_callback_;
     std::vector<std::string> wake_words_;
     EventGroupHandle_t event_group_;
     std::function<void(const std::string& wake_word)> wake_word_detected_callback_;
