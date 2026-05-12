@@ -436,6 +436,10 @@ void Application::Start() {
     callbacks.on_wake_word_detected = [this](const std::string& wake_word) {
         xEventGroupSetBits(event_group_, MAIN_EVENT_WAKE_WORD_DETECTED);
     };
+    callbacks.on_wake_word_target_updated = [this](const std::vector<std::string>& wake_words,
+                                                   const std::vector<std::string>& origin_awakens) {
+        xEventGroupSetBits(event_group_, MAIN_EVENT_WAKE_WORD_TARGET_UPDATED);
+    };
     callbacks.on_vad_change = [this](bool speaking) {
         xEventGroupSetBits(event_group_, MAIN_EVENT_VAD_CHANGE);
     };
@@ -767,6 +771,7 @@ void Application::MainEventLoop() {
         auto bits = xEventGroupWaitBits(event_group_, MAIN_EVENT_SCHEDULE |
             MAIN_EVENT_SEND_AUDIO |
             MAIN_EVENT_WAKE_WORD_DETECTED |
+            MAIN_EVENT_WAKE_WORD_TARGET_UPDATED |
             MAIN_EVENT_VAD_CHANGE |
             MAIN_EVENT_CLOCK_TICK |
             MAIN_EVENT_ERROR, pdTRUE, pdFALSE, portMAX_DELAY);
@@ -791,6 +796,10 @@ void Application::MainEventLoop() {
 
         if (bits & MAIN_EVENT_WAKE_WORD_DETECTED) {
             OnWakeWordDetected();
+        }
+
+        if (bits & MAIN_EVENT_WAKE_WORD_TARGET_UPDATED) {
+            OnWakeWordTargetUpdated();
         }
 
         if (bits & MAIN_EVENT_VAD_CHANGE) {
@@ -879,6 +888,28 @@ void Application::OnWakeWordDetected() {
     } else if (device_state_ == kDeviceStateActivating) {
         SetDeviceState(kDeviceStateIdle);
     }
+}
+
+void Application::OnWakeWordTargetUpdated() {
+    const auto& wake_words = audio_service_.GetWakeWordTargets();
+    const auto& origin_awakens = audio_service_.GetOriginAwakens();
+    std::string wake_words_text;
+    for (size_t i = 0; i < wake_words.size(); ++i) {
+        if (i > 0) {
+            wake_words_text += ", ";
+        }
+        wake_words_text += wake_words[i];
+    }
+    std::string origin_awakens_text;
+    for (size_t i = 0; i < origin_awakens.size(); ++i) {
+        if (i > 0) {
+            origin_awakens_text += ", ";
+        }
+        origin_awakens_text += origin_awakens[i];
+    }
+    ESP_LOGI(TAG, "Wake word targets updated, awakens=%u[%s], originAwakens=%u[%s]",
+             static_cast<unsigned>(wake_words.size()), wake_words_text.c_str(),
+             static_cast<unsigned>(origin_awakens.size()), origin_awakens_text.c_str());
 }
 
 void Application::AbortSpeaking(AbortReason reason) {

@@ -15,6 +15,8 @@ public:
     virtual bool Initialize(AudioCodec* codec, srmodel_list_t* models_list) = 0;
     virtual void Feed(const std::vector<int16_t>& data) = 0;
     virtual void OnWakeWordDetected(std::function<void(const std::string& wake_word)> callback) = 0;
+    virtual void OnWakeWordTargetUpdated(
+        std::function<void(const std::vector<std::string>& wake_words, const std::vector<std::string>& origin_awakens)> callback) {}
     virtual void Start() = 0;
     virtual void Stop() = 0;
     virtual size_t GetFeedSize() = 0;

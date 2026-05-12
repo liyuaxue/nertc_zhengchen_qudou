@@ -832,6 +832,14 @@ void AudioService::SetModelsList(srmodel_list_t* models_list) {
                 callbacks_.on_wake_word_detected(wake_word);
             }
         });
+        wake_word_->OnWakeWordTargetUpdated([this](const std::vector<std::string>& wake_words,
+                                                   const std::vector<std::string>& origin_awakens) {
+            wake_word_targets_ = wake_words;
+            origin_awakens_ = origin_awakens;
+            if (callbacks_.on_wake_word_target_updated) {
+                callbacks_.on_wake_word_target_updated(wake_word_targets_, origin_awakens_);
+            }
+        });
     }
 }
 

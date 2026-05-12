@@ -25,6 +25,7 @@
 #define MAIN_EVENT_ERROR (1 << 4)
 #define MAIN_EVENT_CHECK_NEW_VERSION_DONE (1 << 5)
 #define MAIN_EVENT_CLOCK_TICK (1 << 6)
+#define MAIN_EVENT_WAKE_WORD_TARGET_UPDATED (1 << 7)
 
 
 enum AecMode {
@@ -112,6 +113,7 @@ private:
     bool mic_disabled_for_next_listening_ = false;
 
     void OnWakeWordDetected();
+    void OnWakeWordTargetUpdated();
     void CheckNewVersion(Ota& ota);
     void CheckAssetsVersion();
     void ShowActivationCode(const std::string& code, const std::string& message);

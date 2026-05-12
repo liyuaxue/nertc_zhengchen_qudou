@@ -28,6 +28,19 @@ typedef struct nertc_wakeup_sdk_event_handler {
   * @endif
   */
 void (*on_wake_word_detected)(const nertc_wakeup_sdk_callback_context_t* ctx, const char *wake_word);
+/**
+  *  远端唤醒词目标更新回调。
+  * @param ctx 回调上下文
+  * @param wake_words 更新后的 awakens 数组
+  * @param wake_words_count awakens 数组长度
+  * @param origin_awakens 原始 originAwakens 数组
+  * @param origin_awakens_count originAwakens 数组长度
+  */
+void (*on_wake_word_target_updated)(const nertc_wakeup_sdk_callback_context_t* ctx,
+                                    const char** wake_words,
+                                    size_t wake_words_count,
+                                    const char** origin_awakens,
+                                    size_t origin_awakens_count);
 } nertc_wakeup_sdk_event_handle_t;
 
 //外部http io接口定义

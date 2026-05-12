@@ -14,9 +14,32 @@
 void on_wake_word_detected_handle(const nertc_wakeup_sdk_callback_context_t* ctx, const char *wake_word)
 {
     auto* multinet = static_cast<NertcAfeWakeWord*>(ctx->user_data);
-    //ESP_LOGI("test", "wake_word:%s", wake_word);
     std::string call_back_wake_word = std::string(wake_word);
     multinet->DoCallBack(call_back_wake_word);
+}
+
+void on_wake_word_target_updated_handle(const nertc_wakeup_sdk_callback_context_t* ctx,
+                                        const char** wake_words,
+                                        size_t wake_words_count,
+                                        const char** origin_awakens,
+                                        size_t origin_awakens_count)
+{
+    auto* multinet = static_cast<NertcAfeWakeWord*>(ctx->user_data);
+    std::vector<std::string> wake_word_list;
+    wake_word_list.reserve(wake_words_count);
+    for (size_t i = 0; i < wake_words_count; ++i) {
+        if (wake_words[i] != nullptr) {
+            wake_word_list.emplace_back(wake_words[i]);
+        }
+    }
+    std::vector<std::string> origin_awaken_list;
+    origin_awaken_list.reserve(origin_awakens_count);
+    for (size_t i = 0; i < origin_awakens_count; ++i) {
+        if (origin_awakens[i] != nullptr) {
+            origin_awaken_list.emplace_back(origin_awakens[i]);
+        }
+    }
+    multinet->DoWakeWordTargetUpdatedCallback(wake_word_list, origin_awaken_list);
 }
 
 http_handle create_http() {
@@ -133,7 +156,8 @@ bool NertcAfeWakeWord::Initialize(AudioCodec* codec, srmodel_list_t* models_list
     nertc_wakeup_sdk_config_t config;
     nertc_wakeup_sdk_event_handle_t handle =
     {
-        .on_wake_word_detected = on_wake_word_detected_handle
+        .on_wake_word_detected = on_wake_word_detected_handle,
+        .on_wake_word_target_updated = on_wake_word_target_updated_handle,
     };
     config.event_handler = handle;
 
@@ -181,10 +205,25 @@ void NertcAfeWakeWord::OnWakeWordDetected(std::function<void(const std::string& 
     wake_up_call_back_ = callback;
 }
 
+void NertcAfeWakeWord::OnWakeWordTargetUpdated(
+    std::function<void(const std::vector<std::string>& wake_words, const std::vector<std::string>& origin_awakens)> callback) {
+    wake_word_target_updated_callback_ = callback;
+}
+
 void NertcAfeWakeWord::DoCallBack(std::string& wake_word)
 {
     last_detected_wake_word_ = wake_word;
-    wake_up_call_back_(last_detected_wake_word_);
+    if (wake_up_call_back_) {
+        wake_up_call_back_(last_detected_wake_word_);
+    }
+}
+
+void NertcAfeWakeWord::DoWakeWordTargetUpdatedCallback(const std::vector<std::string>& wake_words,
+                                                       const std::vector<std::string>& origin_awakens)
+{
+    if (wake_word_target_updated_callback_) {
+        wake_word_target_updated_callback_(wake_words, origin_awakens);
+    }
 }
 
 void NertcAfeWakeWord::Start() {
